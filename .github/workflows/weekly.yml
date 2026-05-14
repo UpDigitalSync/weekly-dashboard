@@ -1,0 +1,40 @@
+name: Weekly Strategy Report
+
+on:
+  schedule:
+    - cron: '0 8 * * 1'  # every Monday 08:00 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run agent
+        env:
+          APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+          GA4_PROPERTY_ID: ${{ secrets.GA4_PROPERTY_ID }}
+          GOOGLE_SA_JSON: ${{ secrets.GOOGLE_SA_JSON }}
+          TWITTER_API_KEY: ${{ secrets.TWITTER_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        run: python agent.py
+
+      - name: Commit and push
+        run: |
+          git config user.name  "Strategy Agent"
+          git config user.email "agent@updigitalsync.local"
+          git add index.html archive/
+          git diff --cached --quiet || git commit -m "Weekly report $(date -u +%Y-%m-%d)"
+          git push

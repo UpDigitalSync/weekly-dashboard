@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>UpDigitalSync — Weekly Strategy Dashboard</title>
+<style>
+  :root {
+    --bg: #0d1117; --panel: #161b22; --panel-2: #1c2230; --border: #2a313c;
+    --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff;
+    --good: #3fb950; --bad: #f85149; --warn: #d29922; --flat: #8b949e;
+    --chip-bg: #21262d;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.55; -webkit-font-smoothing: antialiased; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 32px 24px 64px; }
+  header.hero { display: flex; justify-content: space-between; align-items: flex-end;
+    flex-wrap: wrap; gap: 16px; padding-bottom: 20px; border-bottom: 1px solid var(--border);
+    margin-bottom: 28px; }
+  header.hero h1 { font-size: 24px; margin: 0 0 6px; letter-spacing: -0.01em; }
+  header.hero .sub { color: var(--muted); font-size: 13px; }
+  header.hero .meta { text-align: right; color: var(--muted); font-size: 12px; }
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px; margin-bottom: 36px; }
+  .kpi { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px 18px; }
+  .kpi .label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+  .kpi .value { font-size: 26px; font-weight: 600; margin-top: 6px; }
+  .kpi .delta { font-size: 12px; margin-top: 4px; }
+  .delta.up { color: var(--good); } .delta.down { color: var(--bad); } .delta.flat { color: var(--flat); }
+  section.block { background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    padding: 24px 26px; margin-bottom: 24px; }
+  section.block > h2 { margin: 0 0 4px; font-size: 18px; display: flex; align-items: center; gap: 10px; }
+  section.block > h2 .pill { font-size: 11px; font-weight: 500; color: var(--muted); background: var(--chip-bg);
+    border: 1px solid var(--border); padding: 3px 8px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.06em; }
+  section.block > .question { color: var(--muted); font-size: 13px; margin: 0 0 18px; font-style: italic; }
+  h3.subheading { font-size: 14px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted);
+    margin: 24px 0 10px; font-weight: 600; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tr:last-child td { border-bottom: none; }
+  .channel-row { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: start;
+    padding: 14px 0; border-bottom: 1px solid var(--border); }
+  .channel-row:last-child { border-bottom: none; }
+  .channel-row .handle { font-weight: 600; font-size: 15px; margin-bottom: 4px; }
+  .channel-row .handle .arrow { font-size: 14px; margin-right: 4px; }
+  .channel-row .desc { font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+  .channel-row .stat-line { font-size: 12px; color: var(--text); }
+  .channel-row .badge { font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
+  .badge.growing { background: rgba(63, 185, 80, 0.15); color: var(--good); border: 1px solid rgba(63, 185, 80, 0.35); }
+  .badge.declining { background: rgba(248, 81, 73, 0.15); color: var(--bad); border: 1px solid rgba(248, 81, 73, 0.35); }
+  .badge.flat { background: rgba(139, 148, 158, 0.15); color: var(--flat); border: 1px solid rgba(139, 148, 158, 0.35); }
+  .badge.coldstart { background: rgba(210, 153, 34, 0.15); color: var(--warn); border: 1px solid rgba(210, 153, 34, 0.35); }
+  .insight { margin-top: 12px; padding: 12px 14px; background: var(--panel-2); border-left: 3px solid var(--accent);
+    border-radius: 4px; font-size: 13px; }
+  .insight strong { color: var(--accent); }
+  .trend-list { margin: 0; padding: 0; list-style: none; }
+  .trend-item { padding: 14px 0; border-bottom: 1px solid var(--border); }
+  .trend-item:last-child { border-bottom: none; }
+  .trend-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+  .trend-title { font-weight: 600; font-size: 14px; }
+  .trend-meta { font-size: 11px; color: var(--muted); }
+  .relevance { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.06em; }
+  .relevance.high { background: rgba(63, 185, 80, 0.15); color: var(--good); }
+  .relevance.medium { background: rgba(210, 153, 34, 0.15); color: var(--warn); }
+  .relevance.low { background: rgba(139, 148, 158, 0.15); color: var(--flat); }
+  .trend-desc { font-size: 12.5px; color: var(--muted); }
+  .trend-action { margin-top: 6px; font-size: 12px; }
+  .trend-action strong { color: var(--accent); }
+  .flag-list, .prio-list { margin: 0; padding: 0; list-style: none; }
+  .flag-item { padding: 10px 12px; background: rgba(248, 81, 73, 0.08); border-left: 3px solid var(--bad);
+    border-radius: 4px; margin-bottom: 8px; font-size: 13px; }
+  .flag-item .lbl { color: var(--bad); font-weight: 600; margin-right: 8px; font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.06em; }
+  .prio-item { display: grid; grid-template-columns: 30px 1fr auto; align-items: center; gap: 12px;
+    padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .prio-item:last-child { border-bottom: none; }
+  .prio-rank { font-weight: 700; color: var(--accent); font-size: 16px; }
+  .prio-tags { display: flex; gap: 6px; }
+  .tag { font-size: 10px; padding: 2px 8px; border-radius: 999px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.06em; background: var(--chip-bg); border: 1px solid var(--border); color: var(--muted); }
+  .tag.tiktok { color: #ff6b9b; border-color: rgba(255, 107, 155, 0.3); }
+  .tag.seo { color: #58a6ff; border-color: rgba(88, 166, 255, 0.3); }
+  .tag.knowledge { color: #a371f7; border-color: rgba(163, 113, 247, 0.3); }
+  .tag.effort-low, .tag.impact-high { color: var(--good); border-color: rgba(63, 185, 80, 0.3); }
+  .tag.effort-high, .tag.impact-low { color: var(--bad); border-color: rgba(248, 81, 73, 0.3); }
+  .tag.effort-medium, .tag.impact-medium { color: var(--warn); border-color: rgba(210, 153, 34, 0.3); }
+  .pending { padding: 10px 12px; background: rgba(210, 153, 34, 0.08); border-left: 3px solid var(--warn);
+    border-radius: 4px; margin-bottom: 12px; font-size: 13px; }
+  .pending .lbl { color: var(--warn); font-weight: 600; margin-right: 8px; font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.06em; }
+  footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--border);
+    color: var(--muted); font-size: 11.5px; text-align: center; }
+  @media (max-width: 760px) {
+    .wrap { padding: 20px 14px 40px; }
+    section.block { padding: 18px 18px; }
+    header.hero { flex-direction: column; align-items: flex-start; }
+    header.hero .meta { text-align: left; }
+    .channel-row { grid-template-columns: 1fr; }
+    .channel-row .badge { justify-self: start; }
+    .prio-item { grid-template-columns: 24px 1fr; }
+    .prio-item .prio-tags { grid-column: 2; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <div>
+      <h1>UpDigitalSync — Weekly Strategy Dashboard</h1>
+      <div class="sub">Week of 2026-05-14 · TikTok · SEO · Knowledge Engine</div>
+    </div>
+    <div class="meta">
+      Generated 2026-05-14 18:10 UTC<br/>
+      Auto-run weekly via GitHub Actions
+    </div>
+  </header>
+
+  
+  
+  
+  
+  
+
+  <div class="kpi-grid">
+    <div class="kpi">
+      <div class="label">TikTok Active Channels</div>
+      <div class="value">3</div>
+      <div class="delta flat">@routebites · @neuro_dispenza · @undermapped</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Top Channel Avg Views</div>
+      <div class="value">869</div>
+      <div class="delta flat">@routebites · last 10 videos</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Site Articles Live</div>
+      <div class="value">11</div>
+      <div class="delta up">+11 since 07.05 launch</div>
+    </div>
+  </div>
+
+  
+  <section class="block" id="tiktok">
+    <h2>1. TikTok — Channel Performance <span class="pill">Pillar 1</span></h2>
+    <p class="question">Which videos performed well, which didn't, is there a pattern?</p>
+
+    
+
+    <h3 class="subheading">Channel Snapshot</h3>
+    
+    
+    <div class="channel-row">
+      <div>
+        <div class="handle">
+          <a href="https://www.tiktok.com/@routebites" target="_blank" rel="noopener">@routebites</a>
+        </div>
+        <div class="desc">Carousel-style &#39;Save this for your future trip&#39; vids outperform detailed guides. High views but low engagement. Format resonates.</div>
+        <div class="stat-line">
+          avg <strong>869 views</strong>
+           · top: <a href="https://www.tiktok.com/@routebites/video/7639128271434599681" target="_blank" rel="noopener">2699 views</a>
+        </div>
+      </div>
+      <div class="badge growing">GROWING</div>
+    </div>
+    
+    
+    <div class="channel-row">
+      <div>
+        <div class="handle">
+          <a href="https://www.tiktok.com/@neuro_dispenza" target="_blank" rel="noopener">@neuro_dispenza</a>
+        </div>
+        <div class="desc">Neville Goddard content spikes. &#39;The Reason It Hasn’t Manifested Yet Is THIS!&#39; got 105 likes / 3 shares.</div>
+        <div class="stat-line">
+          avg <strong>290 views</strong>
+           · top: <a href="https://www.tiktok.com/@neuro_dispenza/video/7638386513859955975" target="_blank" rel="noopener">1240 views</a>
+        </div>
+      </div>
+      <div class="badge growing">GROWING</div>
+    </div>
+    
+    
+    <div class="channel-row">
+      <div>
+        <div class="handle">
+          <a href="https://www.tiktok.com/@undermapped" target="_blank" rel="noopener">@undermapped</a>
+        </div>
+        <div class="desc">Dog animation series gaining traction. &#39;doggie learns rich vs wealthy&#39; performed best. Comedy/finance mix works.</div>
+        <div class="stat-line">
+          avg <strong>224 views</strong>
+           · top: <a href="https://www.tiktok.com/@undermapped/video/7638633782127430926" target="_blank" rel="noopener">430 views</a>
+        </div>
+      </div>
+      <div class="badge flat">FLAT</div>
+    </div>
+    
+
+    <h3 class="subheading">Top performers (what worked)</h3>
+    <table>
+      <thead><tr><th>Channel</th><th>Video</th><th class="num">Views</th><th>Why it worked</th></tr></thead>
+      <tbody>
+        
+        <tr>
+          <td>@routebites</td>
+          <td><a href="https://www.tiktok.com/@routebites/video/7639128271434599681" target="_blank" rel="noopener">@routebites/video/7639128271434599681</a></td>
+          <td class="num"><strong>2699</strong></td>
+          <td>Carousel format, clear CTA to save, high viewership.</td>
+        </tr>
+        
+        <tr>
+          <td>@neuro_dispenza</td>
+          <td><a href="https://www.tiktok.com/@neuro_dispenza/video/7638386513859955975" target="_blank" rel="noopener">@neuro_dispenza/video/7638386513859955975</a></td>
+          <td class="num"><strong>1240</strong></td>
+          <td>Neville Goddard content – high engagement and shares.</td>
+        </tr>
+        
+        <tr>
+          <td>@undermapped</td>
+          <td><a href="https://www.tiktok.com/@undermapped/video/7638633782127430926" target="_blank" rel="noopener">@undermapped/video/7638633782127430926</a></td>
+          <td class="num"><strong>430</strong></td>
+          <td>Dog animation series, relatable finance humor.</td>
+        </tr>
+        
+      </tbody>
+    </table>
+
+    <h3 class="subheading">Underperformers (what didn't work)</h3>
+    <table>
+      <thead><tr><th>Channel</th><th>Video</th><th class="num">Views</th><th>Diagnosis</th></tr></thead>
+      <tbody>
+        
+        <tr>
+          <td>@routebites</td>
+          <td><a href="https://www.tiktok.com/@routebites/video/7639499355493240081" target="_blank" rel="noopener">@routebites/video/7639499355493240081</a></td>
+          <td class="num">181</td>
+          <td>Low views, possibly due to posting time or lack of hook. Carousel but no strong CTA.</td>
+        </tr>
+        
+        <tr>
+          <td>@neuro_dispenza</td>
+          <td><a href="https://www.tiktok.com/@neuro_dispenza/video/7639499815084199186" target="_blank" rel="noopener">@neuro_dispenza/video/7639499815084199186</a></td>
+          <td class="num">109</td>
+          <td>Weak hook – generic Jim Rohn quote. Low interest.</td>
+        </tr>
+        
+        <tr>
+          <td>@undermapped</td>
+          <td><a href="https://www.tiktok.com/@undermapped/video/7639747217682615565" target="_blank" rel="noopener">@undermapped/video/7639747217682615565</a></td>
+          <td class="num">79</td>
+          <td>Off-topic (property/economy), not aligned with channel&#39;s core humor/finance theme.</td>
+        </tr>
+        
+      </tbody>
+    </table>
+
+    
+    <div class="insight"><strong>Pattern.</strong> Carousel and clip formats with strong hooks (Neville Goddard, ‘save this…’) outperform. Detailed travel guides underperform. Short, punchy content drives views. Low shares across channels – viral potential untapped.</div>
+    
+  </section>
+
+  
+  <section class="block" id="seo">
+    <h2>2. SEO — triptiplist.com <span class="pill">Pillar 2</span></h2>
+    <p class="question">Is traffic growing, which articles are starting to rank, where are the gaps?</p>
+
+    
+
+    <h3 class="subheading">Traffic this week</h3>
+    
+    
+    <table>
+      <thead><tr><th>Metric</th><th class="num">This week</th><th class="num">WoW change</th></tr></thead>
+      <tbody>
+        <tr><td>Sessions</td><td class="num">17</td><td class="num">—</td></tr>
+        <tr><td>Users</td><td class="num">16</td><td class="num">—</td></tr>
+        <tr><td>Pageviews</td><td class="num">25</td><td class="num">—</td></tr>
+        <tr><td>Avg session</td><td class="num">29.1s</td><td class="num">—</td></tr>
+        <tr><td>Bounce rate</td><td class="num">88.2%</td><td class="num">—</td></tr>
+      </tbody>
+    </table>
+
+    <h3 class="subheading">Top pages</h3>
+    <table>
+      <thead><tr><th>Path</th><th class="num">Pageviews</th><th class="num">Sessions</th></tr></thead>
+      <tbody>
+        
+        <tr><td><a href="https://triptiplist.com/" target="_blank" rel="noopener">/</a></td>
+            <td class="num">21</td>
+            <td class="num">17</td></tr>
+        
+        <tr><td><a href="https://triptiplist.com/portugal/best-time-to-visit-portugal/" target="_blank" rel="noopener">/portugal/best-time-to-visit-portugal/</a></td>
+            <td class="num">3</td>
+            <td class="num">2</td></tr>
+        
+        <tr><td><a href="https://triptiplist.com/japan/best-time-to-visit-japan/" target="_blank" rel="noopener">/japan/best-time-to-visit-japan/</a></td>
+            <td class="num">1</td>
+            <td class="num">1</td></tr>
+        
+      </tbody>
+    </table>
+
+    <h3 class="subheading">Articles starting to rank</h3>
+    
+    <div class="pending"><span class="lbl">Awaiting data</span>Sitemap submission to GSC + 7–14 days of crawl required before ranking data exists.</div>
+    
+
+    <h3 class="subheading">Content gaps</h3>
+    
+    <ul><li>Sitemap not submitted to GSC – zero organic traffic.</li><li>Only ~11 articles – content volume insufficient.</li><li>Traffic is purely direct/referral – no search presence.</li></ul>
+    
+
+    
+    <div class="insight"><strong>Insight.</strong> No organic traffic due to pending sitemap submission to GSC. All 17 sessions are direct (16) or referral (1). Sitemap gating step must be completed ASAP. Content is too thin to rank even after submission.</div>
+    
+  </section>
+
+  
+  <section class="block" id="knowledge">
+    <h2>3. Knowledge Engine — Trends & Topics <span class="pill">Pillar 3</span></h2>
+    <p class="question">Are there any new trends or topics worth exploring?</p>
+
+    
+
+    <h3 class="subheading">Trends from this week's X scan (sorted by date)</h3>
+    <ul class="trend-list">
+      
+      <li class="trend-item">
+        <div class="trend-head">
+          <div class="trend-title">AI agents are the next generation of software</div>
+          <div class="trend-meta">2026-05-14 · <span class="relevance high">high</span></div>
+        </div>
+        <div class="trend-desc">
+          Skills, MCP servers, subagents architecture. Agentic stack explained.
+          <br/>Source: <a href="https://x.com/sjsandeep_jain/status/2054760170929139891" target="_blank" rel="noopener">https://x.com/sjsandeep_jain/status/2054760170929139891</a>
+        </div>
+        <div class="trend-action"><strong>Action:</strong> Create content on agent architecture and skills marketplace.</div>
+      </li>
+      
+      <li class="trend-item">
+        <div class="trend-head">
+          <div class="trend-title">Agent memory and persistent context</div>
+          <div class="trend-meta">2026-05-14 · <span class="relevance high">high</span></div>
+        </div>
+        <div class="trend-desc">
+          Tool &#39;agentmemory&#39; for long-term memory in agents. Open-source.
+          <br/>Source: <a href="https://x.com/NFTCPS/status/2054778184772768117" target="_blank" rel="noopener">https://x.com/NFTCPS/status/2054778184772768117</a>
+        </div>
+        <div class="trend-action"><strong>Action:</strong> Explore agentmemory for persistent knowledge in our own agents.</div>
+      </li>
+      
+      <li class="trend-item">
+        <div class="trend-head">
+          <div class="trend-title">Skills marketplace with 1M+ AI skills</div>
+          <div class="trend-meta">2026-05-14 · <span class="relevance high">high</span></div>
+        </div>
+        <div class="trend-desc">
+          Ready-to-deploy skills for Claude Code, Codex, etc.
+          <br/>Source: <a href="https://x.com/olegcl/status/2054940933876044197" target="_blank" rel="noopener">https://x.com/olegcl/status/2054940933876044197</a>
+        </div>
+        <div class="trend-action"><strong>Action:</strong> Investigate marketplace for reusable skills to accelerate channel creation.</div>
+      </li>
+      
+      <li class="trend-item">
+        <div class="trend-head">
+          <div class="trend-title">Codex plugin for Claude Code</div>
+          <div class="trend-meta">2026-05-14 · <span class="relevance medium">medium</span></div>
+        </div>
+        <div class="trend-desc">
+          OpenAI Codex now runs inside Claude Code for reviews and parallel workflows.
+          <br/>Source: <a href="https://x.com/RoundtableSpace/status/2054890719492354067" target="_blank" rel="noopener">https://x.com/RoundtableSpace/status/2054890719492354067</a>
+        </div>
+        <div class="trend-action"><strong>Action:</strong> Test Codex plugin inside Claude Code for efficiency gains.</div>
+      </li>
+      
+      <li class="trend-item">
+        <div class="trend-head">
+          <div class="trend-title">AI automation consultant demand rising</div>
+          <div class="trend-meta">2026-05-14 · <span class="relevance medium">medium</span></div>
+        </div>
+        <div class="trend-desc">
+          Businesses need AI workflows but lack implementation know-how.
+          <br/>Source: <a href="https://x.com/FarhanBuildsAI/status/2054936005200015390" target="_blank" rel="noopener">https://x.com/FarhanBuildsAI/status/2054936005200015390</a>
+        </div>
+        <div class="trend-action"><strong>Action:</strong> Consider offering AI automation consulting as a service.</div>
+      </li>
+      
+      <li class="trend-item">
+        <div class="trend-head">
+          <div class="trend-title">Claude + Obsidian to build AI employee</div>
+          <div class="trend-meta">2026-05-14 · <span class="relevance medium">medium</span></div>
+        </div>
+        <div class="trend-desc">
+          Step-by-step guide to create an AI employee in an afternoon.
+          <br/>Source: <a href="https://x.com/DataChaz/status/2054823237054329176" target="_blank" rel="noopener">https://x.com/DataChaz/status/2054823237054329176</a>
+        </div>
+        <div class="trend-action"><strong>Action:</strong> Replicate for internal use to automate repetitive tasks.</div>
+      </li>
+      
+      <li class="trend-item">
+        <div class="trend-head">
+          <div class="trend-title">Legal AI skills from Anthropic</div>
+          <div class="trend-meta">2026-05-14 · <span class="relevance low">low</span></div>
+        </div>
+        <div class="trend-desc">
+          Open-source legal skills and MCP connectors for complex tasks.
+          <br/>Source: <a href="https://x.com/WesRoth/status/2054788801126621226" target="_blank" rel="noopener">https://x.com/WesRoth/status/2054788801126621226</a>
+        </div>
+        <div class="trend-action"><strong>Action:</strong> Not directly applicable to our travel/finance niche, but architecture inspiration.</div>
+      </li>
+      
+    </ul>
+  </section>
+
+  
+  
+  <section class="block" id="flags">
+    <h2>Flags requiring attention this week</h2>
+    <ul class="flag-list">
+      
+      <li class="flag-item"><span class="lbl">seo</span>Sitemap not submitted to GSC – zero organic traffic. Critical gating step.</li>
+      
+      <li class="flag-item"><span class="lbl">tiktok</span>All channels have low share counts. Virality not achieved. Focus on shareable hooks.</li>
+      
+    </ul>
+  </section>
+  
+
+  
+  
+  <section class="block" id="priorities">
+    <h2>Priorities — next 7 days</h2>
+    <ul class="prio-list">
+      
+      <li class="prio-item">
+        <div class="prio-rank">1</div>
+        <div>Submit sitemap of triptiplist.com to Google Search Console</div>
+        <div class="prio-tags">
+          <span class="tag seo">seo</span>
+          <span class="tag effort-low">Effort: low</span>
+          <span class="tag impact-high">Impact: high</span>
+        </div>
+      </li>
+      
+      <li class="prio-item">
+        <div class="prio-rank">2</div>
+        <div>Create 5+ more articles on high-volume travel topics (e.g., budget travel hacks, hidden gems)</div>
+        <div class="prio-tags">
+          <span class="tag seo">seo</span>
+          <span class="tag effort-medium">Effort: medium</span>
+          <span class="tag impact-high">Impact: high</span>
+        </div>
+      </li>
+      
+      <li class="prio-item">
+        <div class="prio-rank">3</div>
+        <div>Double down on &#39;Save this&#39; carousel format for routebites – post daily</div>
+        <div class="prio-tags">
+          <span class="tag tiktok">tiktok</span>
+          <span class="tag effort-low">Effort: low</span>
+          <span class="tag impact-medium">Impact: medium</span>
+        </div>
+      </li>
+      
+      <li class="prio-item">
+        <div class="prio-rank">4</div>
+        <div>Test Neville Goddard / manifestation clips on neuro_dispenza – high engagement potential</div>
+        <div class="prio-tags">
+          <span class="tag tiktok">tiktok</span>
+          <span class="tag effort-low">Effort: low</span>
+          <span class="tag impact-medium">Impact: medium</span>
+        </div>
+      </li>
+      
+      <li class="prio-item">
+        <div class="prio-rank">5</div>
+        <div>Consolidate undermapped channel around dog animation finance series – drop off-topic posts</div>
+        <div class="prio-tags">
+          <span class="tag tiktok">tiktok</span>
+          <span class="tag effort-low">Effort: low</span>
+          <span class="tag impact-medium">Impact: medium</span>
+        </div>
+      </li>
+      
+      <li class="prio-item">
+        <div class="prio-rank">6</div>
+        <div>Build an internal AI automation tool using agent memory and skills marketplace insights</div>
+        <div class="prio-tags">
+          <span class="tag knowledge">knowledge</span>
+          <span class="tag effort-high">Effort: high</span>
+          <span class="tag impact-high">Impact: high</span>
+        </div>
+      </li>
+      
+      <li class="prio-item">
+        <div class="prio-rank">7</div>
+        <div>Create a skills marketplace report – analyze top skills for content production</div>
+        <div class="prio-tags">
+          <span class="tag knowledge">knowledge</span>
+          <span class="tag effort-medium">Effort: medium</span>
+          <span class="tag impact-medium">Impact: medium</span>
+        </div>
+      </li>
+      
+    </ul>
+  </section>
+  
+
+  <footer>
+    UpDigitalSync · Weekly Strategy Dashboard · generated 2026-05-14 18:10 UTC<br/>
+    Sources: Apify (TikTok) · GA4 Data API (triptiplist.com) · TwitterAPI.io (X trends) · Claude (synthesis)
+  </footer>
+
+</div>
+</body>
+</html>
