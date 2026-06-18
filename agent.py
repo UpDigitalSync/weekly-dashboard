@@ -14,6 +14,7 @@ from __future__ import annotations
 import datetime as dt
 import json
 import os
+import re
 import sys
 import traceback
 from pathlib import Path
@@ -75,7 +76,10 @@ def fetch_tiktok() -> dict:
     )
     payload = {
         "profiles": [f"https://www.tiktok.com/@{h}" for h in TIKTOK_CHANNELS],
-        "resultsPerPage": 10,
+        # Wider window so the all-time best video (which can be a viral or pinned
+        # post outside the most-recent handful) is actually captured, not just the
+        # last 10. The recent-momentum metrics still use the freshest 10.
+        "resultsPerPage": 45,
         "shouldDownloadCovers": False,
         "shouldDownloadVideos": False,
         "shouldDownloadSubtitles": False,
@@ -117,13 +121,22 @@ def fetch_tiktok() -> dict:
             None,
         ) or {}
         meta = author_meta.get("authorMeta") or {}
-        views_list = [v["views"] for v in videos if v["views"]]
+        all_views = [v["views"] for v in videos if v["views"]]
+        recent10 = videos[:10]  # videos already sorted newest-first
+        recent_views = [v["views"] for v in recent10 if v["views"]]
+        best = max(videos, key=lambda v: v["views"], default=None)
         summary[handle] = {
+            # All-time channel stats (impressive, reliable):
             "followers": meta.get("fans"),
             "total_likes": meta.get("heart"),
-            "videos": videos,
-            "avg_views": int(sum(views_list) / len(views_list)) if views_list else 0,
-            "top_video": max(videos, key=lambda v: v["views"], default=None),
+            "total_videos": meta.get("video"),
+            "best_video_views": best["views"] if best else 0,
+            "best_video_url": best["url"] if best else None,
+            "total_views_scraped": sum(all_views),
+            # Recent-momentum stats (last 10):
+            "avg_views": int(sum(recent_views) / len(recent_views)) if recent_views else 0,
+            "videos": recent10,
+            "top_video": best,
         }
     return {"channels": summary, "fetched_at": dt.datetime.utcnow().isoformat()}
 
@@ -309,9 +322,13 @@ across our 3 business pillars and produce a strategic brief in JSON.
 ## Context
 - TikTok: 3 channels — @routebites (travel carousels), @neuro_dispenza (motivation
   clips), @undermapped (hidden places carousels). Goal: scale to 20+ channels.
-- SEO: triptiplist.com (travel guides for Portugal, Italy, Japan; ~11 articles).
-  New domain — established 07.05.2026; sitemap submission to GSC is the gating
-  step for any organic traffic.
+  Each channel's data includes all-time stats (followers, total_likes,
+  best_video_views) and recent-momentum stats (avg_views over the last 10). For
+  top_video_views in your output, use the channel's best_video_views (the
+  all-time best in the scraped set), not the recent average.
+- SEO: triptiplist.com (travel guides across multiple countries, growing via an
+  autopilot content engine). New domain — established 07.05.2026; sitemap is
+  submitted to GSC and indexing is in progress.
 - Knowledge Engine: scrapes X for trends in AI agents, MCP, Claude Code, AI
   automation. Goal: discover trends worth exploring.
 
@@ -397,7 +414,26 @@ def synthesize_with_deepseek(tiktok: dict, ga4: dict, trends: dict) -> dict:
 
 # ---------- render ----------
 
-def render_html(analysis: dict, raw: dict) -> str:
+def fetch_article_count() -> int:
+    """Live count of published articles from the triptiplist sitemap — country
+    article URLs only (exclude homepage and country index pages). Keeps the
+    'Site Articles Live' KPI honest instead of a hardcoded number."""
+    try:
+        r = requests.get("https://triptiplist.com/sitemap.xml", timeout=30)
+        r.raise_for_status()
+        locs = re.findall(r"<loc>(.*?)</loc>", r.text)
+        count = 0
+        for u in locs:
+            path = u.replace("https://triptiplist.com", "").strip("/")
+            parts = [p for p in path.split("/") if p]
+            if len(parts) == 2:  # {country}/{slug} = an article (not / or /country/)
+                count += 1
+        return count
+    except Exception:
+        return 0
+
+
+def render_html(analysis: dict, raw: dict, articles_live: int) -> str:
     env = Environment(
         loader=FileSystemLoader(str(ROOT)),
         autoescape=select_autoescape(["html"]),
@@ -406,6 +442,7 @@ def render_html(analysis: dict, raw: dict) -> str:
     return template.render(
         analysis=analysis,
         raw=raw,
+        articles_live=articles_live,
         generated_at=dt.datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC"),
         week_iso=dt.date.today().isoformat(),
     )
@@ -445,7 +482,10 @@ def main() -> int:
             "knowledge_engine": {"trends": []},
         }
 
-    html = render_html(analysis, raw={"tiktok": tiktok, "ga4": ga4, "trends": trends})
+    articles_live = fetch_article_count()
+    print(f"[articles] live count from sitemap: {articles_live}")
+    html = render_html(analysis, raw={"tiktok": tiktok, "ga4": ga4, "trends": trends},
+                       articles_live=articles_live)
 
     (ROOT / "index.html").write_text(html, encoding="utf-8")
     (ARCHIVE_DIR / f"week-{today}.html").write_text(html, encoding="utf-8")

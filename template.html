@@ -143,8 +143,8 @@
     </div>
     <div class="kpi">
       <div class="label">Site Articles Live</div>
-      <div class="value">11</div>
-      <div class="delta up">+11 since 07.05 launch</div>
+      <div class="value">{{ articles_live | default('—', true) }}</div>
+      <div class="delta up">auto-published, since 07.05 launch</div>
     </div>
   </div>
 
@@ -160,6 +160,7 @@
     <h3 class="subheading">Channel Snapshot</h3>
     {% for handle, status_badge in [('routebites', 'growing'), ('neuro_dispenza', 'growing'), ('undermapped', 'coldstart')] %}
     {% set c = channels[handle] or {} %}
+    {% set r = (raw.tiktok.channels or {})[handle] or {} %}
     <div class="channel-row">
       <div>
         <div class="handle">
@@ -167,8 +168,12 @@
         </div>
         <div class="desc">{{ c.insight or '—' }}</div>
         <div class="stat-line">
-          {% if c.avg_views %}avg <strong>{{ c.avg_views }} views</strong>{% else %}avg views: —{% endif %}
-          {% if c.top_video_views %} · top: <a href="{{ c.top_video_url }}" target="_blank" rel="noopener">{{ c.top_video_views }} views</a>{% endif %}
+          {% if r.followers %}<strong>{{ "{:,}".format(r.followers) }}</strong> followers{% endif %}
+          {% if r.total_likes %} · <strong>{{ "{:,}".format(r.total_likes) }}</strong> likes{% endif %}
+          {% if r.best_video_views %} · best video <a href="{{ r.best_video_url }}" target="_blank" rel="noopener"><strong>{{ "{:,}".format(r.best_video_views) }}</strong> views</a>{% endif %}
+        </div>
+        <div class="stat-line" style="opacity:.75;font-size:.85em;">
+          recent momentum: {% if c.avg_views %}avg {{ c.avg_views }} views (last 10){% else %}—{% endif %}
         </div>
       </div>
       <div class="badge {{ c.status or status_badge }}">{{ (c.status or status_badge) | upper }}</div>
