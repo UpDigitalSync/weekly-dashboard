@@ -2,7 +2,7 @@ name: Weekly Strategy Report
 
 on:
   schedule:
-    - cron: '0 8 * * 1'  # every Monday 08:00 UTC
+    - cron: '0 8 * * *'  # daily 08:00 UTC (daily refresh during aggressive sprint)
   workflow_dispatch: {}
 
 permissions:
